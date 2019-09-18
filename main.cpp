@@ -32,6 +32,7 @@ void shooting();
 void setColor(int col);
 void clearBullets();
 void shooting();
+void collisionCheck();
 
 
 int BLACK = 0;
@@ -51,9 +52,9 @@ float actual_elapsed_time_f;
 int pixels [1800];
 
 string pixel = "  ";
-string bullet = "[]";
+string bullet = "II";
 
-int bulletToErase = 0;
+bool bulletToErase = false;
 
 int playerPosX = 10; int playerPosY = 10;
 int state;
@@ -64,18 +65,21 @@ int verticalLimiter = 0;
 int verticalLimiterCheck = 2;
 
 bool space_pressed = false;
+bool weHaveAnImpact = false;
 
 struct Enemy {
     int posX; int posY;
     int verticalEnmLimiter = 0;
     int verticalEnmLimiterCheck = 75; // aka movement Speed
+    vector<std::pair<int, int>> posCords;
     
     void draw() {
-        drawPixel(posX - 2, posY, RED);
-        drawPixel(posX , posY, RED);
-        drawPixel(posX + 2, posY, RED);
-        drawPixel(posX - 2 , posY + 1, RED);
-        drawPixel(posX + 2 , posY + 1, RED);
+        
+        drawPixel(posX - 2, posY, RED);  posCords.push_back(std::make_pair(posX - 2, posY));
+        drawPixel(posX , posY, RED);  posCords.push_back(std::make_pair(posX , posY));
+        drawPixel(posX + 2, posY, RED);  posCords.push_back(std::make_pair(posX + 2, posY));
+        drawPixel(posX - 2 , posY + 1, RED);  posCords.push_back(std::make_pair(posX - 2 , posY + 1));
+        drawPixel(posX + 2 , posY + 1, RED);  posCords.push_back(std::make_pair(posX + 2 , posY + 1));
 
         if (verticalEnmLimiter == verticalEnmLimiterCheck) {
             posY++;
@@ -95,32 +99,40 @@ struct Enemy {
 struct Bullet {
     int posX; int posY;
     int verticalBulLimiter = 0;
-    int verticalBulLimiterCheck = 35; // aka movement Speed
+    int verticalBulLimiterCheck = 10; // aka movement Speed
+    bool toDelete = false;
 
     void draw() {
-        gotoxy(posX,posY);
-        setColor(14);
-        cout << bullet << endl;
+        if (posY  > - 1) {
 
-        //if (posY - 1 == 0) {
-        //   bulletToErase = 1;
-        //}
+            gotoxy(posX,posY);
+            setColor(14);
+            cout << bullet << endl;
 
-        if (verticalBulLimiter == verticalBulLimiterCheck) {
-            posY--;
-            clearPixel(posX, posY + 1);
-            verticalBulLimiter = 0;
+            //if (posY - 1 == 0) {
+            //   bulletToErase = 1;
+            //}
+
+            if (verticalBulLimiter == verticalBulLimiterCheck) {
+                posY--;
+                clearPixel(posX, posY + 1);
+                verticalBulLimiter = 0;
+            }
+            else {
+                verticalBulLimiter++;
+            }
+
+            bulletToErase = false;
         }
-        else {
-            verticalBulLimiter++;
-        }
+
+        else { bulletToErase = true; }
 
     }
 };
 
 std::vector<Bullet> bullets;
 
-Bullet test_bullet;
+//Enemy test_enemy;
 
 int main() {
 
@@ -149,7 +161,8 @@ int main() {
         cout << pixel;
     }
 
-    Enemy test_enemy; test_enemy.posX = 10; test_enemy.posY = 10;
+    //test_enemy.posX = 10; test_enemy.posY = 10;
+
 
 /// MAIN LOOP ///
     while (true) {
@@ -157,21 +170,22 @@ int main() {
 
         /// LOGGING HERE
         log();
-        cout << "Bullet to erase: " << bulletToErase <<  "  FPS: " << 1000000 / actual_elapsed_time_f << " Space pressed: " << space_pressed << endl;
+        cout << "Bullets.size :" << bullets.size() <<  " BulletToErase: " << bulletToErase <<   "  FPS: " << 1000000 / actual_elapsed_time_f << endl;
         /// LOGGING HERE
 
 ///////////////////////////// MAIN LOOP ZONE ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        test_enemy.draw();
+        //test_enemy.draw();
 
         checkForInput();
         shooting();
         drawPlayer();
-        if (shot) {test_bullet.draw(); }
-        //for (Bullet x : bullets) {
-        //   x.draw();
-        //}
 
+        for ( int i = 0; i < bullets.capacity(); i++) {
+            bullets[i].draw();
+        }
+    
+        //collisionCheck();
         clearBullets();
 //////////////////////////MAIN LOOP ZONE END //////////////////////////////////////////////////////////////////////////////////////////////////////////////   
 
@@ -185,7 +199,7 @@ int main() {
         actual_elapsed_time_int = std::chrono::duration_cast<std::chrono::microseconds>(actual_end - start).count();
         actual_elapsed_time_f = std::chrono::duration_cast<std::chrono::microseconds>(actual_end - start).count();
     }
-/// MAIN LOOP END ///
+/// MAIN LOOP END //////////////
 
     return 0;
 }
@@ -282,22 +296,34 @@ void drawPixel(int x, int y, int col) {
 }
 
 void shooting() {
-    if(GetAsyncKeyState(VK_SPACE) && !shot) {
+    if(GetAsyncKeyState(VK_SPACE) && !space_pressed) {
         space_pressed = true;
         Bullet new_bullet;
         new_bullet.posX = playerPosX + 2;
         new_bullet.posY = playerPosY - 1;
         //bullets.push_back(new_bullet);
-        test_bullet = new_bullet;
+        bullets.emplace_back(new_bullet);
         shot = true;
     }
-    else {
+    else if(!GetAsyncKeyState(VK_SPACE)) {
         space_pressed = false;
     }
 }
 
 void clearBullets() {
-    if (bulletToErase == 1) {
+    if (bulletToErase == true) {
         bullets.pop_back();
+        bulletToErase = false;
     }
 }
+
+/*void collisionCheck() {
+    for ( int i = 0; i < bullets.capacity(); i++) {
+        for (int y = 0; y < test_enemy.posCords.capacity(); y++) {
+            if (bullets[i].posX == test_enemy.posCords[y].first && bullets[i].posY == test_enemy.posCords[y].second){
+                weHaveAnImpact = true;
+            }
+            else { weHaveAnImpact = false; }
+        }
+    }
+}*/
